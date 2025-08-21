@@ -68,7 +68,7 @@ const HistoryDetailModal: React.FC<HistoryDetailModalProps> = ({ record, onClose
                             <div className="text-blue-600 dark:text-blue-400 mb-2">
                                 <i className='bx bx-target text-2xl'></i>
                             </div>
-                            <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">Grand Total Poin</h4>
+                            <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">Grand Total Poins</h4>
                             <p className={`${pointsFontSize} font-bold text-blue-800 dark:text-blue-200 font-mono`}>{pointsText}</p>
                         </div>
                         <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/30 dark:to-indigo-800/30 p-6 rounded-xl text-center h-full flex flex-col justify-center border border-indigo-200/50 dark:border-indigo-700/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
