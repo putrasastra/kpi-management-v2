@@ -1,0 +1,5 @@
+{
+  "name": "KPI MANAGEMENT SASTRO",
+  "description": "A dynamic platform to manage and calculate bonuses based on Key Performance Indicators (KPIs) across multiple divisions. Features include a bonus calculator, performance dashboards with historical data, and a comprehensive admin panel for managing employees, KPIs, and incentive schemes.",
+  "requestFramePermissions": []
+}
