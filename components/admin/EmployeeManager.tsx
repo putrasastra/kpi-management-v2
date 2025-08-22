@@ -54,7 +54,7 @@ const EmployeeManager: React.FC = () => {
         if (!employeeToDelete) return;
 
         if (window.confirm(`Hapus staff "${employeeToDelete.name}"?`)) {
-            addLog(`Deleted employee: "${employeeToDelete.name}"`, currentDivision);
+            addLog(`Deleted employee: "${employeeToDelete.name}"`, currentDivision, `ID: ${employeeToDelete.id}`);
             setAppData(prev => {
                 const newAppData = {...prev};
                 if(newAppData[currentDivision]) {

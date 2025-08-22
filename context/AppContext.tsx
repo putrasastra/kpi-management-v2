@@ -19,6 +19,7 @@ interface AppContextType {
     logs: LogEntry[];
     addLog: (action: string, division: string, details?: string) => void;
     clearLogs: () => void;
+    renameDivision: (oldName: string, newName: string) => void;
 }
 
 export const AppContext = createContext<AppContextType>({} as AppContextType);
@@ -137,7 +138,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             return;
         }
 
-        addLog(`Deleted division: "${divisionName}"`, divisionName);
+        addLog(`Deleted division: "${divisionName}"`, divisionName, (() => {
+            const data = appData[divisionName];
+            if (!data) return undefined;
+            return `Employees: ${data.employees.length}, KPIs: ${data.kpiConfigs.length}, Bonus Schemes: ${data.bonusSchemes.length}, Indicators: ${data.kpiIndicators.length}, History: ${data.history.length}`;
+        })());
         const nextDivision = (currentDivision === divisionName) ? remainingDivisions[0] : currentDivision;
 
         setAppData(prevData => {
@@ -149,6 +154,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setCurrentDivision(nextDivision);
     };
 
+    const renameDivision = (oldName: string, newName: string) => {
+        const trimmed = newName.trim();
+        if (!trimmed) {
+            alert('Nama divisi tidak boleh kosong.');
+            return;
+        }
+        if (oldName === trimmed) return;
+        if (appData[trimmed]) {
+            alert(`Divisi dengan nama "${trimmed}" sudah ada.`);
+            return;
+        }
+
+        setAppData(prev => {
+            const copy = { ...prev } as AppData;
+            const data = copy[oldName];
+            if (!data) return prev;
+            delete copy[oldName];
+            copy[trimmed] = data;
+            return copy;
+        });
+
+        addLog(`Renamed division: "${oldName}" → "${trimmed}"`, trimmed, `From: ${oldName} To: ${trimmed}`);
+
+        if (currentDivision === oldName) {
+            setCurrentDivision(trimmed);
+        }
+    };
 
     const currentDivisionData = appData[currentDivision] || {
         employees: [],
@@ -175,7 +207,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             setCurrentUser,
             logs,
             addLog,
-            clearLogs
+            clearLogs,
+            renameDivision
         }}>
             {children}
         </AppContext.Provider>

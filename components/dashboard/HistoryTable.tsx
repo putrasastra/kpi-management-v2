@@ -50,7 +50,9 @@ const HistoryTable: React.FC = () => {
         if (!recordToDelete) return;
 
         if (window.confirm('Apakah Anda yakin ingin menghapus riwayat ini?')) {
-            addLog(`Deleted history record for ${recordToDelete.employeeName}`, currentDivision, `Date: ${recordToDelete.date}`);
+            const period = recordToDelete.periodMonth && recordToDelete.periodYear ? `${recordToDelete.periodMonth} ${recordToDelete.periodYear}` : '-';
+            const details = `Date: ${recordToDelete.date}, Period: ${period}, Total Poin: ${recordToDelete.totalPoints.toFixed(3)}` + (typeof recordToDelete.bonus === 'number' ? `, Bonus: ${recordToDelete.bonus}` : '');
+            addLog(`Deleted history record for ${recordToDelete.employeeName}`, currentDivision, details);
             setAppData(prevData => {
                 const newAppData = { ...prevData };
                 if (newAppData[currentDivision]) {

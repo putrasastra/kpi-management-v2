@@ -60,7 +60,22 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({ results, onExport, bonu
                         </>
                     ) : (
                         <>
-                            <p>Aktual: <span className="font-bold text-slate-800 dark:text-slate-200">{formatCurrency(totalOmsetRealisasi)}</span></p>
+                            <div className="relative group">
+                                <div className="flex items-center justify-center gap-2">
+                                    <span>Aktual</span>
+                                    <span className="relative group inline-flex">
+                                        <button type="button" aria-label="Informasi Omset Aktual" className="inline-flex items-center justify-center w-5 h-5 rounded-full border-2 border-yellow-400 text-yellow-500 bg-white dark:bg-slate-700 shadow hover:bg-yellow-50">
+                                            <i className='bx bx-info-circle text-[14px]'></i>
+                                        </button>
+                                        <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 px-3 py-2 opacity-0 group-hover:opacity-100 group-hover:-translate-y-[110%] transition z-10 whitespace-nowrap">
+                                            Semua KPI Rupiah (kecuali biaya)
+                                            <span className="absolute left-1/2 -bottom-1 -translate-x-1/2 w-2 h-2 bg-white dark:bg-slate-800 border-l border-t border-slate-200 dark:border-slate-700 transform rotate-45"></span>
+                                        </div>
+                                    </span>
+                                    <span className="font-bold text-slate-800 dark:text-slate-200">{formatCurrency(totalOmsetRealisasi)}</span>
+                                </div>
+                                <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap">Semua KPI Rupiah (kecuali biaya)</span>
+                            </div>
                             <p>Target: <span className="font-bold text-slate-800 dark:text-slate-200">{formatCurrency(totalOmsetTarget)}</span></p>
                         </>
                     )}
@@ -108,8 +123,20 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({ results, onExport, bonu
                 <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="bg-slate-100 dark:bg-slate-800/50 p-6 rounded-xl text-center ring-1 ring-slate-200 dark:ring-slate-700">
                         <h3 className="text-md font-medium text-slate-500 dark:text-slate-400 mb-2">Indikator KPI</h3>
-                        <div className={`indicator-badge inline-block px-4 py-2 rounded-full font-semibold text-white text-sm text-center ${kpiIndicator.color}`}>
-                            {kpiIndicator.name}
+                        <div className={`indicator-badge inline-block px-4 py-2 rounded-full font-semibold text-white text-sm text-center ${getIndicatorColor(omsetIndicator.name)}`}>
+                            {omsetIndicator.name}
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                            <span className="text-md font-medium">Indikator Omset</span>
+                            <span className="relative group inline-flex">
+                                <button type="button" aria-label="Informasi Indikator Omset" className="inline-flex items-center justify-center w-5 h-5 rounded-full border-2 border-yellow-400 text-yellow-500 bg-white dark:bg-slate-700 shadow hover:bg-yellow-50">
+                                    <i className='bx bx-info-circle text-[14px]'></i>
+                                </button>
+                                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 px-3 py-2 opacity-0 group-hover:opacity-100 group-hover:-translate-y-[110%] transition z-10 whitespace-nowrap">
+                                    Omset Aktual menjumlah semua KPI bertipe Rupiah, kecuali yang namanya mengandung kata kunci biaya.
+                                    <span className="absolute left-1/2 -bottom-1 -translate-x-1/2 w-2 h-2 bg-white dark:bg-slate-800 border-l border-t border-slate-200 dark:border-slate-700 transform rotate-45"></span>
+                                </div>
+                            </span>
                         </div>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-3">Total Poin: <span className="font-bold text-slate-800 dark:text-slate-200 font-mono">{grandTotalPoin.toFixed(3)}</span></p>
                     </div>

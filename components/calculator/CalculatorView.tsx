@@ -32,9 +32,16 @@ const CalculatorView: React.FC = () => {
     }, [currentDivision, employees]);
 
     const handleCalculate = useCallback(() => {
-        const calculatedResults = calculateBonus(kpiConfigs, bonusSchemes, kpiIndicators, realisasiInputs, bonusCalculationMethod);
+        const calculatedResults = calculateBonus(
+            kpiConfigs,
+            bonusSchemes,
+            kpiIndicators,
+            realisasiInputs,
+            bonusCalculationMethod,
+            currentDivisionData.costKeywords
+        );
         setResults(calculatedResults);
-    }, [kpiConfigs, bonusSchemes, kpiIndicators, realisasiInputs, bonusCalculationMethod]);
+    }, [kpiConfigs, bonusSchemes, kpiIndicators, realisasiInputs, bonusCalculationMethod, currentDivisionData.costKeywords]);
 
     useEffect(() => {
         // Automatically calculate on input change if there are any inputs
@@ -142,6 +149,8 @@ const CalculatorView: React.FC = () => {
         } else {
             exportToPDF(currentDivisionData, results, employee.name, currentDivision);
         }
+        const details = `Format: ${format.toUpperCase()}, Staff: ${employee.name}` + (results ? `, Poin: ${results.grandTotalPoin.toFixed(3)}, Bonus: ${formatCurrency(results.finalBonus)}` : '');
+        addLog(`Exported KPI report`, currentDivision, details);
     };
 
     const platforms = [...new Set(kpiConfigs.map(k => k.platform))];

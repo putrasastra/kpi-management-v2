@@ -52,6 +52,7 @@ export interface DivisionData {
     bonusSchemes: BonusScheme[];
     kpiIndicators: KpiIndicator[];
     bonusCalculationMethod: 'OMSET_BASED' | 'POINTS_BASED' | 'NON_SALES';
+    costKeywords?: string[]; // kata kunci biaya tambahan per divisi
 }
 
 export interface AppData {

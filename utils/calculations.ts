@@ -7,12 +7,23 @@ export const calculateBonus = (
     bonusSchemes: BonusScheme[],
     kpiIndicators: KpiIndicator[],
     realisasiInputs: RealisasiInput,
-    bonusCalculationMethod: DivisionData['bonusCalculationMethod']
+    bonusCalculationMethod: DivisionData['bonusCalculationMethod'],
+    customCostKeywords?: string[]
 ): CalculationResult => {
     let totalOmsetRealisasi = 0;
     let totalOmsetTarget = 0;
     let grandTotalPoin = 0;
     const details: KpiResultDetail[] = [];
+
+    // Cost keywords helper (supports custom override per division)
+    const DEFAULT_COST_KEYWORDS = ['biaya', 'cost', 'spend', 'ads', 'iklan'];
+    const COST_KEYWORDS = (customCostKeywords && customCostKeywords.length > 0)
+        ? customCostKeywords.map(k => (k || '').toLowerCase().trim()).filter(Boolean)
+        : DEFAULT_COST_KEYWORDS;
+    const isCostKpi = (name: string) => {
+        const n = (name || '').toLowerCase();
+        return COST_KEYWORDS.some(kw => n.includes(kw));
+    };
 
     // Pre-calculate ROAS values
     const platforms = [...new Set(kpiConfigs.map(k => k.platform))];
@@ -20,8 +31,13 @@ export const calculateBonus = (
 
     platforms.forEach(platform => {
         const roasKpi = kpiConfigs.find(k => k.platform === platform && k.specialCalc === 'ROAS');
-        const omsetKpi = kpiConfigs.find(k => k.platform === platform && k.name.toLowerCase().includes('omset'));
-        const biayaKpi = kpiConfigs.find(k => k.platform === platform && k.name.toLowerCase().includes('biaya'));
+        let omsetKpi = kpiConfigs.find(k => k.platform === platform && k.name.toLowerCase().includes('omset'));
+        const biayaKpi = kpiConfigs.find(k => k.platform === platform && isCostKpi(k.name));
+
+        // Fallback: if no explicit 'omset' KPI, pick the first currency KPI in this platform that is not a cost-related KPI
+        if (!omsetKpi) {
+            omsetKpi = kpiConfigs.find(k => k.platform === platform && k.isCurrency && !isCostKpi(k.name) && k.specialCalc !== 'ROAS');
+        }
 
         if (roasKpi && omsetKpi && biayaKpi) {
             const omsetRealisasi = parseFloat(parseRupiah(realisasiInputs[omsetKpi.id] || '0')) || 0;
@@ -42,7 +58,7 @@ export const calculateBonus = (
             realisasi = parseFloat(realisasiValue) || 0;
         }
 
-        if (kpi.name.toLowerCase().includes('omset') && kpi.isCurrency) {
+        if (kpi.isCurrency && !isCostKpi(kpi.name)) {
             totalOmsetRealisasi += realisasi;
             totalOmsetTarget += kpi.target;
         }
