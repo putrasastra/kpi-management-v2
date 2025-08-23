@@ -25,7 +25,8 @@ const KpiConfigInstruction: React.FC = () => {
                                 <li><b>Metode Kalkulasi:</b> Pilih cara bonus dihitung. Perubahan antara "Berbasis Omset" dan "Berbasis Poin" akan menghapus skema bonus yang ada.</li>
                                 <li><b>Tambah/Edit KPI:</b> Gunakan formulir di bawah tabel untuk menambahkan atau mengedit KPI.</li>
                                 <li><b>Platform/Grup:</b> Tentukan grup untuk KPI (misal: Shopee) untuk pengelompokan di kalkulator.</li>
-                                <li><b>Tipe Target:</b> Pilih apakah target berupa Rupiah (Rp), Persentase (%), atau Angka.</li>
+                                <li><b>Jenis KPI:</b> Pilih <strong>GENERAL KPI</strong> untuk menambahkan <em>satu</em> KPI biasa, atau pilih <strong>KPI ROAS</strong> untuk menambahkan <em>paket KPI</em> sekaligus (ROAS wajib; Omset dan Biaya Iklan opsional).</li>
+                                <li><b>Tipe Target:</b> Untuk <strong>GENERAL KPI</strong>, pilih apakah target berupa Rupiah (Rp), Persentase (%), atau Angka. Untuk <strong>KPI ROAS</strong>, target selalu berupa <strong>Angka</strong> dan tersedia kolom <strong>Target Min.</strong>.</li>
                                 <li><b>Total Bobot:</b> Pastikan total bobot dari semua KPI untuk satu divisi adalah 100%.</li>
                             </ul>
                         </li>
@@ -40,9 +41,10 @@ const KpiConfigInstruction: React.FC = () => {
                             <strong className="font-semibold text-white">Perilaku Sistem & Fitur Otomatis (Penting!):</strong>
                             <ul className="list-disc list-inside pl-5 text-sm space-y-3 mt-2 bg-white/10 p-4 rounded-lg">
                                 <li><b>Total Omset Otomatis:</b> Untuk divisi "Berbasis Omset", sistem otomatis menjumlahkan <strong>semua KPI bertipe Rupiah (Rp)</strong> sebagai Omset Aktual. KPI yang berhubungan dengan biaya (nama mengandung <strong>kata kunci biaya</strong>, misal: "biaya", "cost", "ads", "iklan") <strong>tidak</strong> dihitung ke omset.</li>
-                                <li><b>ROAS Otomatis:</b> KPI dengan nama <strong>"ROAS"</strong> akan dihitung otomatis jika ada KPI Rupiah dan KPI biaya dalam grup/platform yang sama — <strong>tanpa</strong> perlu menyertakan kata "omset".</li>
+                                <li><b>ROAS Otomatis + Pembuatan Paket:</b> Saat membuat KPI baru dengan <strong>Jenis KPI = "KPI ROAS"</strong>, sistem menyediakan satu form untuk membuat <strong>paket</strong> KPI: 1) <em>KPI ROAS</em> (bobot, target angka, target minimum), 2) <em>KPI Omset</em> (opsional, bobot dan target Rp), 3) <em>KPI Biaya Iklan</em> (opsional, bobot dan target Rp). Semua otomatis terhubung pada platform/grup yang sama dan perhitungan ROAS akan muncul di kalkulator.</li>
                                 <li className="text-xs opacity-80">Catatan: <em>Daftar kata kunci biaya dapat diatur</em> di bagian "Pengaturan Kata Kunci Biaya" pada halaman ini.</li>
-                                <li><b>Target Minimum ROAS:</b> Jika realisasi di bawah target minimum, poin KPI ROAS akan menjadi <strong>nol (0)</strong>.</li>
+                                <li><b>Target Minimum ROAS:</b> Untuk KPI ROAS, kolom <strong>Target Min.</strong> akan muncul. Jika realisasi di bawah target minimum, poin KPI ROAS akan menjadi <strong>nol (0)</strong>.</li>
+                                <li><b>Konversi KPI lama:</b> Jika masih ada KPI bernama "roas" (bukan KPI ROAS), tersedia tombol <em>Konversi "roas" → KPI ROAS</em> di toolbar untuk mengubahnya menjadi tipe KPI ROAS.</li>
                                 <li><b>Batas Poin (Capping):</b> Opsi "Poin Maksimal" akan membatasi poin KPI agar tidak melebihi nilai <strong>Bobot</strong>-nya.</li>
                                 <li><strong className="text-yellow-300 dark:text-yellow-400">Peringatan:</strong> Mengubah "Metode Kalkulasi" akan <strong>MENGHAPUS</strong> skema bonus yang ada.</li>
                             </ul>

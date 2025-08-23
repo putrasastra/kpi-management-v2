@@ -49,10 +49,10 @@ type KpiConfig struct {
 	Bobot        float64   `json:"bobot"`
 	Target       float64   `json:"target"`
 	MinTarget    *float64  `json:"minTarget"`
-	Type         string    `json:"type"`        // higher_is_better | lower_is_better
+	Type         string    `json:"type"`         // higher_is_better | lower_is_better
 	IsCurrency   bool      `json:"isCurrency"`
 	IsPercentage bool      `json:"isPercentage"`
-	SpecialCalc  *string   `json:"specialCalc"` // ROAS or null
+	SpecialCalc  *string   `json:"specialCalc"`  // ROAS or null
 	PointCapping string    `json:"pointCapping"` // uncapped | capped
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
@@ -68,6 +68,7 @@ type HistoryEntry struct {
 	PeriodYear     int       `json:"periodYear"`
 	TotalPoints    float64   `json:"totalPoints"`
 	Bonus          float64   `json:"bonus"`
+	ResultsJSON    string    `json:"resultsJson" gorm:"type:text"`
 	PDFDataURI     *string   `json:"pdfDataUri"`
 	CreatedAt      time.Time `json:"createdAt"`
 	UpdatedAt      time.Time `json:"updatedAt"`
@@ -83,21 +84,21 @@ type KpiResultDetail struct {
 }
 
 type CalculationResult struct {
-	GrandTotalPoin     float64          `json:"grandTotalPoin"`
-	FinalBonus         float64          `json:"finalBonus"`
-	ActiveMultiplier   float64          `json:"activeMultiplier"`
-	KpiIndicator       map[string]any   `json:"kpiIndicator"`
-	OmsetIndicator     map[string]any   `json:"omsetIndicator"`
-	TotalOmsetRealisasi float64         `json:"totalOmsetRealisasi"`
-	TotalOmsetTarget   float64          `json:"totalOmsetTarget"`
-	Details            []KpiResultDetail `json:"details"`
+	GrandTotalPoin      float64           `json:"grandTotalPoin"`
+	FinalBonus          float64           `json:"finalBonus"`
+	ActiveMultiplier    float64           `json:"activeMultiplier"`
+	KpiIndicator        map[string]any    `json:"kpiIndicator"`
+	OmsetIndicator      map[string]any    `json:"omsetIndicator"`
+	TotalOmsetRealisasi float64           `json:"totalOmsetRealisasi"`
+	TotalOmsetTarget    float64           `json:"totalOmsetTarget"`
+	Details             []KpiResultDetail `json:"details"`
 }
 
 type CalculateRequest struct {
-	KpiConfigs            []KpiConfig        `json:"kpiConfigs"`
-	BonusSchemes          []BonusScheme      `json:"bonusSchemes"`
-	KpiIndicators         []KpiIndicator     `json:"kpiIndicators"`
-	RealisasiInputs       map[uint]string    `json:"realisasiInputs"`
-	BonusCalculationMethod string            `json:"bonusCalculationMethod"`
-	CustomCostKeywords    []string           `json:"customCostKeywords"`
+	KpiConfigs             []KpiConfig     `json:"kpiConfigs"`
+	BonusSchemes           []BonusScheme   `json:"bonusSchemes"`
+	KpiIndicators          []KpiIndicator  `json:"kpiIndicators"`
+	RealisasiInputs        map[uint]string `json:"realisasiInputs"`
+	BonusCalculationMethod string          `json:"bonusCalculationMethod"`
+	CustomCostKeywords     []string        `json:"customCostKeywords"`
 }

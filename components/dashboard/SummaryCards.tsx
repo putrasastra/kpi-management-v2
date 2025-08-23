@@ -36,13 +36,25 @@ const SummaryCard: React.FC<{ icon: string; title: string; value: string | numbe
 };
 
 
-const SummaryCards: React.FC = () => {
+interface SummaryCardsProps {
+    selectedMonth?: string;
+    selectedYear?: string;
+}
+
+const SummaryCards: React.FC<SummaryCardsProps> = ({ selectedMonth, selectedYear }) => {
     const { currentDivisionData } = useContext(AppContext);
     const isNonSales = currentDivisionData.bonusCalculationMethod === 'NON_SALES';
     
+    // Filter history based on selected month and year
+    const filteredHistory = currentDivisionData.history.filter(record => {
+        const matchesMonth = !selectedMonth || record.periodMonth === selectedMonth;
+        const matchesYear = !selectedYear || record.periodYear?.toString() === selectedYear;
+        return matchesMonth && matchesYear;
+    });
+    
     const totalEmployees = currentDivisionData.employees.length;
-    const highestPoints = currentDivisionData.history.length > 0 ? Math.max(...currentDivisionData.history.map(h => h.totalPoints)) : 0;
-    const totalBonus = currentDivisionData.history.reduce((acc, h) => acc + h.bonus, 0);
+    const highestPoints = filteredHistory.length > 0 ? Math.max(...filteredHistory.map(h => h.totalPoints)) : 0;
+    const totalBonus = filteredHistory.reduce((acc, h) => acc + h.bonus, 0);
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/sqlite"
@@ -24,6 +26,9 @@ func main() {
 	if err := db.AutoMigrate(&Division{}, &Employee{}, &BonusScheme{}, &KpiIndicator{}, &KpiConfig{}, &HistoryEntry{}); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
 	}
+
+	// Seed database if empty
+	SeedDatabase()
 
 	r := gin.Default()
 	// CORS for local dev
@@ -109,7 +114,7 @@ func main() {
 		c.JSON(http.StatusCreated, payload)
 	})
 
-	// Calculation endpoint
+	// Calculate endpoint
 	r.POST("/calculate", func(c *gin.Context) {
 		var req CalculateRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -118,6 +123,124 @@ func main() {
 		}
 		res := CalculateBonus(req.KpiConfigs, req.BonusSchemes, req.KpiIndicators, req.RealisasiInputs, req.BonusCalculationMethod, req.CustomCostKeywords)
 		c.JSON(http.StatusOK, res)
+	})
+
+	// History endpoints
+	// Response DTO
+	type HistoryResponse struct {
+		ID           uint              `json:"id"`
+		DivisionID   uint              `json:"divisionId"`
+		EmployeeID   uint              `json:"employeeId"`
+		EmployeeName string            `json:"employeeName"`
+		Date         time.Time         `json:"date"`
+		PeriodMonth  string            `json:"periodMonth"`
+		PeriodYear   int               `json:"periodYear"`
+		TotalPoints  float64           `json:"totalPoints"`
+		Bonus        float64           `json:"bonus"`
+		Results      CalculationResult `json:"results"`
+		PDFDataURI   *string           `json:"pdfDataUri"`
+	}
+	// GET /history with filters: division_id or division_name, optional employee_id, month, year
+	r.GET("/history", func(c *gin.Context) {
+		q := db.Model(&HistoryEntry{})
+		if dn := c.Query("division_name"); dn != "" {
+			var div Division
+			if err := db.Where("name = ?", dn).First(&div).Error; err == nil {
+				q = q.Where("division_id = ?", div.ID)
+			}
+		}
+		if did := c.Query("division_id"); did != "" { q = q.Where("division_id = ?", did) }
+		if eid := c.Query("employee_id"); eid != "" { q = q.Where("employee_id = ?", eid) }
+		if pm := c.Query("period_month"); pm != "" { q = q.Where("period_month = ?", pm) }
+		if py := c.Query("period_year"); py != "" { q = q.Where("period_year = ?", py) }
+
+		var items []HistoryEntry
+		if err := q.Order("created_at desc").Find(&items).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}); return
+		}
+		responses := make([]HistoryResponse, 0, len(items))
+		for _, it := range items {
+			var res CalculationResult
+			if it.ResultsJSON != "" { _ = json.Unmarshal([]byte(it.ResultsJSON), &res) }
+			responses = append(responses, HistoryResponse{
+				ID: it.ID, DivisionID: it.DivisionID, EmployeeID: it.EmployeeID, EmployeeName: it.EmployeeName,
+				Date: it.Date, PeriodMonth: it.PeriodMonth, PeriodYear: it.PeriodYear,
+				TotalPoints: it.TotalPoints, Bonus: it.Bonus, Results: res, PDFDataURI: it.PDFDataURI,
+			})
+		}
+		c.JSON(http.StatusOK, responses)
+	})
+
+	// POST /history create
+	type HistoryCreateRequest struct {
+		DivisionID   uint              `json:"divisionId"`
+		DivisionName string            `json:"divisionName"`
+		EmployeeID   uint              `json:"employeeId"`
+		EmployeeName string            `json:"employeeName"`
+		Date         string            `json:"date"`
+		PeriodMonth  string            `json:"periodMonth"`
+		PeriodYear   int               `json:"periodYear"`
+		TotalPoints  float64           `json:"totalPoints"`
+		Bonus        float64           `json:"bonus"`
+		Results      CalculationResult `json:"results"`
+		PDFDataURI   *string           `json:"pdfDataUri"`
+	}
+	
+	r.POST("/history", func(c *gin.Context) {
+		var req HistoryCreateRequest
+		if err := c.ShouldBindJSON(&req); err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return }
+
+		var divisionID uint = req.DivisionID
+		if divisionID == 0 && strings.TrimSpace(req.DivisionName) != "" {
+			var div Division
+			if err := db.Where("name = ?", req.DivisionName).First(&div).Error; err == nil {
+				divisionID = div.ID
+			}
+		}
+		if divisionID == 0 { c.JSON(http.StatusBadRequest, gin.H{"error":"divisionId or valid divisionName is required"}); return }
+
+		// Check duplicate: per division, employee, period
+		var cnt int64
+		if err := db.Model(&HistoryEntry{}).Where("division_id=? AND employee_id=? AND period_month=? AND period_year=?",
+			divisionID, req.EmployeeID, req.PeriodMonth, req.PeriodYear).Count(&cnt).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}); return
+		}
+		if cnt > 0 { c.JSON(http.StatusConflict, gin.H{"error":"duplicate history for employee and period"}); return }
+
+		parsedDate := time.Now()
+		if t, err := time.Parse(time.RFC3339, req.Date); err == nil { parsedDate = t }
+
+		b, err := json.Marshal(req.Results)
+		if err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": "invalid results payload"}); return }
+
+		entry := HistoryEntry{
+			DivisionID:   divisionID,
+			EmployeeID:   req.EmployeeID,
+			EmployeeName: req.EmployeeName,
+			Date:         parsedDate,
+			PeriodMonth:  req.PeriodMonth,
+			PeriodYear:   req.PeriodYear,
+			TotalPoints:  req.TotalPoints,
+			Bonus:        req.Bonus,
+			ResultsJSON:  string(b),
+			PDFDataURI:   req.PDFDataURI,
+		}
+		if err := db.Create(&entry).Error; err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}); return }
+
+		// Build response
+		resp := HistoryResponse{
+			ID: entry.ID, DivisionID: entry.DivisionID, EmployeeID: entry.EmployeeID, EmployeeName: entry.EmployeeName,
+			Date: entry.Date, PeriodMonth: entry.PeriodMonth, PeriodYear: entry.PeriodYear,
+			TotalPoints: entry.TotalPoints, Bonus: entry.Bonus, Results: req.Results, PDFDataURI: entry.PDFDataURI,
+		}
+		c.JSON(http.StatusCreated, resp)
+	})
+
+	// DELETE /history/:id
+	r.DELETE("/history/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		if err := db.Delete(&HistoryEntry{}, id).Error; err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}); return }
+		c.Status(http.StatusNoContent)
 	})
 
 	// Utility endpoint to update division cost keywords

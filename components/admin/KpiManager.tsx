@@ -7,6 +7,17 @@ type KpiFormState = Omit<Partial<KpiConfig>, 'bobot' | 'target' | 'minTarget'> &
     bobot?: string | number;
     target?: string | number;
     minTarget?: string | number | null;
+    kpiType?: 'GENERAL' | 'ROAS';
+    // Paket ROAS fields (untuk mode tambah baru)
+    roasBobot?: string | number;
+    roasTarget?: string | number;
+    roasMinTarget?: string | number | null;
+    omsetEnabled?: boolean;
+    omsetBobot?: string | number;
+    omsetTarget?: string | number;
+    biayaEnabled?: boolean;
+    biayaBobot?: string | number;
+    biayaTarget?: string | number;
 };
 
 const initialFormState: KpiFormState = {
@@ -19,7 +30,18 @@ const initialFormState: KpiFormState = {
     isCurrency: true,
     isPercentage: false,
     specialCalc: null,
-    pointCapping: 'uncapped'
+    pointCapping: 'uncapped',
+    kpiType: 'GENERAL',
+    // Paket ROAS defaults
+    roasBobot: '',
+    roasTarget: '',
+    roasMinTarget: '',
+    omsetEnabled: true,
+    omsetBobot: '',
+    omsetTarget: '',
+    biayaEnabled: true,
+    biayaBobot: '',
+    biayaTarget: '',
 };
 
 // --- Helper Components ---
@@ -95,7 +117,8 @@ const KpiManager: React.FC = () => {
                 ...isEditing,
                 target: isEditing.isCurrency ? formatToRupiah(String(isEditing.target)) : String(isEditing.target),
                 bobot: String(isEditing.bobot),
-                minTarget: isEditing.minTarget != null ? String(isEditing.minTarget) : ''
+                minTarget: isEditing.minTarget != null ? String(isEditing.minTarget) : '',
+                kpiType: isEditing.specialCalc === 'ROAS' ? 'ROAS' : 'GENERAL',
             });
         } else {
             setFormState(initialFormState);
@@ -174,44 +197,129 @@ const KpiManager: React.FC = () => {
 
     const handleSave = useCallback((e: React.FormEvent) => {
         e.preventDefault();
+
+        // Jika sedang edit, tetap gunakan flow satu KPI (tidak paket)
+        if (isEditing) {
+            const isRoas = formState.kpiType === 'ROAS';
+            const isCurrencyFinal = isRoas ? false : Boolean(formState.isCurrency);
+            const isPercentageFinal = isRoas ? false : Boolean(formState.isPercentage);
+
+            const kpiToSave: KpiConfig = {
+                id: isEditing.id,
+                name: formState.name || '',
+                platform: formState.platform || '',
+                bobot: Number(formState.bobot) || 0,
+                target: Number(isCurrencyFinal ? parseRupiah(String(formState.target || '')) : formState.target) || 0,
+                type: formState.type || 'higher_is_better',
+                isCurrency: isCurrencyFinal,
+                isPercentage: isPercentageFinal,
+                minTarget: isRoas ? (Number(formState.minTarget) || null) : null,
+                specialCalc: isRoas ? 'ROAS' : null,
+                pointCapping: formState.pointCapping || 'uncapped'
+            };
+
+            addLog(`Updated KPI: "${kpiToSave.name}"`, currentDivision, `Platform: ${isEditing.platform} -> ${kpiToSave.platform}, Bobot: ${isEditing.bobot}% -> ${kpiToSave.bobot}%, Target: ${isEditing.target} -> ${kpiToSave.target}`);
+
+            setAppData(prev => {
+                const currentKpis = prev[currentDivision]?.kpiConfigs || [];
+                const updatedKpis = currentKpis.map(k => k.id === kpiToSave.id ? kpiToSave : k);
+                return { ...prev, [currentDivision]: { ...prev[currentDivision], kpiConfigs: updatedKpis } };
+            });
+
+            closeModal();
+            return;
+        }
+
+        // Mode TAMBAH BARU
+        if (formState.kpiType === 'ROAS') {
+            // Paket KPI ROAS
+            const platform = (formState.platform || '').trim();
+            const ts = Date.now();
+
+            const roasKpi: KpiConfig = {
+                id: ts,
+                name: `ROAS ${platform}`.trim(),
+                platform,
+                bobot: Number(formState.roasBobot) || 0,
+                target: Number(formState.roasTarget) || 0,
+                type: 'higher_is_better',
+                isCurrency: false,
+                isPercentage: false,
+                minTarget: formState.roasMinTarget !== '' && formState.roasMinTarget != null ? (Number(formState.roasMinTarget) || null) : null,
+                specialCalc: 'ROAS',
+                pointCapping: 'uncapped'
+            };
+
+            const newKpis: KpiConfig[] = [roasKpi];
+
+            if (formState.omsetEnabled) {
+                newKpis.push({
+                    id: ts + 1,
+                    name: `Realisasi Omset ${platform}`.trim(),
+                    platform,
+                    bobot: Number(formState.omsetBobot) || 0,
+                    target: Number(parseRupiah(String(formState.omsetTarget || ''))) || 0,
+                    type: 'higher_is_better',
+                    isCurrency: true,
+                    isPercentage: false,
+                    minTarget: null,
+                    specialCalc: null,
+                    pointCapping: 'uncapped'
+                });
+            }
+
+            if (formState.biayaEnabled) {
+                newKpis.push({
+                    id: ts + 2,
+                    name: `Efisiensi Biaya Iklan ${platform}`.trim(),
+                    platform,
+                    bobot: Number(formState.biayaBobot) || 0,
+                    target: Number(parseRupiah(String(formState.biayaTarget || ''))) || 0,
+                    type: 'lower_is_better',
+                    isCurrency: true,
+                    isPercentage: false,
+                    minTarget: null,
+                    specialCalc: null,
+                    pointCapping: 'uncapped'
+                });
+            }
+
+            addLog(`Created KPI Paket ROAS (${newKpis.length} KPI)`, currentDivision, `Platform: ${platform}`);
+
+            setAppData(prev => {
+                const currentKpis = prev[currentDivision]?.kpiConfigs || [];
+                return {
+                    ...prev,
+                    [currentDivision]: { ...prev[currentDivision], kpiConfigs: [...currentKpis, ...newKpis] }
+                };
+            });
+
+            closeModal();
+            return;
+        }
+
+        // GENERAL KPI (tambah baru)
         const kpiToSave: KpiConfig = {
-            id: isEditing ? isEditing.id : Date.now(),
+            id: Date.now(),
             name: formState.name || '',
             platform: formState.platform || '',
             bobot: Number(formState.bobot) || 0,
             target: Number(formState.isCurrency ? parseRupiah(String(formState.target || '')) : formState.target) || 0,
             type: formState.type || 'higher_is_better',
-            isCurrency: formState.isCurrency || false,
-            isPercentage: formState.isPercentage || false,
-            minTarget: formState.name?.toLowerCase().includes('roas') ? Number(formState.minTarget) || null : null,
-            specialCalc: formState.name?.toLowerCase().includes('roas') ? 'ROAS' : null,
+            isCurrency: Boolean(formState.isCurrency),
+            isPercentage: Boolean(formState.isPercentage),
+            minTarget: null,
+            specialCalc: null,
             pointCapping: formState.pointCapping || 'uncapped'
         };
-        
-        const action = isEditing ? `Updated KPI: "${kpiToSave.name}"` : `Created KPI: "${kpiToSave.name}"`;
-        let details: string | undefined;
-        if (isEditing) {
-            details = `Platform: ${isEditing.platform} -> ${kpiToSave.platform}, Bobot: ${isEditing.bobot}% -> ${kpiToSave.bobot}%, Target: ${isEditing.target} -> ${kpiToSave.target}`;
-        } else {
-            details = `Platform: ${kpiToSave.platform}, Bobot: ${kpiToSave.bobot}%, Target: ${kpiToSave.target}`;
-        }
-        addLog(action, currentDivision, details);
-
+        addLog(`Created KPI: "${kpiToSave.name}"`, currentDivision, `Platform: ${kpiToSave.platform}, Bobot: ${kpiToSave.bobot}%, Target: ${kpiToSave.target}`);
         setAppData(prev => {
             const currentKpis = prev[currentDivision]?.kpiConfigs || [];
-            const updatedKpis = isEditing
-                ? currentKpis.map(k => k.id === kpiToSave.id ? kpiToSave : k)
-                : [...currentKpis, kpiToSave];
-            
-            return {
-                ...prev,
-                [currentDivision]: { ...prev[currentDivision], kpiConfigs: updatedKpis }
-            }
+            return { ...prev, [currentDivision]: { ...prev[currentDivision], kpiConfigs: [...currentKpis, kpiToSave] } };
         });
-
         closeModal();
     }, [currentDivision, setAppData, isEditing, formState, addLog, closeModal]);
-    
+
     const handleDelete = useCallback((id: number) => {
         const kpiToDelete = kpiConfigs.find(k => k.id === id);
         if (!kpiToDelete) return;
@@ -229,7 +337,48 @@ const KpiManager: React.FC = () => {
             });
         }
     }, [currentDivision, setAppData, kpiConfigs, addLog]);
-    
+
+    // Tambahkan daftar kandidat KPI yang mengandung "roas" namun belum bertipe KPI ROAS
+    const roasNameCandidates = useMemo(() => {
+        return kpiConfigs.filter(k => k.name.toLowerCase().includes('roas') && k.specialCalc !== 'ROAS');
+    }, [kpiConfigs]);
+
+    // Handler konversi satu-klik dari nama mengandung "roas" menjadi KPI ROAS
+    const handleConvertRoasMagic = useCallback(() => {
+        const candidates = kpiConfigs.filter(k => k.name.toLowerCase().includes('roas') && k.specialCalc !== 'ROAS');
+        if (candidates.length === 0) {
+            alert('Tidak ada KPI dengan nama mengandung "roas" yang perlu dikonversi.');
+            return;
+        }
+        if (!window.confirm(`Konversi ${candidates.length} KPI menjadi KPI ROAS? Target akan dipaksa "Angka".`)) {
+            return;
+        }
+
+        addLog(`Converted ${candidates.length} KPIs (name contains 'roas') to KPI ROAS`, currentDivision);
+        setAppData(prev => {
+            const divisionData = prev[currentDivision];
+            if (!divisionData) return prev;
+            const updatedKpis = divisionData.kpiConfigs.map(k => {
+                if (k.name.toLowerCase().includes('roas') && k.specialCalc !== 'ROAS') {
+                    const numericTarget = k.isCurrency ? parseRupiah(String(k.target)) : Number(k.target);
+                    return {
+                        ...k,
+                        specialCalc: 'ROAS' as const,
+                        isCurrency: false,
+                        isPercentage: false,
+                        target: Number(numericTarget) || 0,
+                        minTarget: k.minTarget ?? null,
+                    };
+                }
+                return k;
+            });
+            return {
+                ...prev,
+                [currentDivision]: { ...divisionData, kpiConfigs: updatedKpis }
+            };
+        });
+    }, [kpiConfigs, setAppData, currentDivision, addLog]);
+
     const totalBobot = kpiConfigs.reduce((sum, kpi) => sum + (kpi.bobot || 0), 0);
     
     return (
@@ -264,10 +413,23 @@ const KpiManager: React.FC = () => {
                         className="w-full pl-10 pr-3 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1877f2]"
                     />
                 </div>
-                <button onClick={openModalForAdd} className="inline-flex items-center gap-2 bg-[#1877f2] hover:bg-[#166fe5] text-white font-medium py-2 px-4 rounded-lg shadow-sm">
-                    <i className='bx bx-plus text-lg'></i>
-                    <span>Tambah KPI</span>
-                </button>
+                <div className="flex items-center gap-2">
+                    {roasNameCandidates.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={handleConvertRoasMagic}
+                            className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-medium py-2 px-4 rounded-lg shadow-sm"
+                            title="Konversi KPI bernama 'roas' menjadi KPI ROAS"
+                        >
+                            <i className='bx bx-refresh'></i>
+                            <span>Konversi "roas" → KPI ROAS ({roasNameCandidates.length})</span>
+                        </button>
+                    )}
+                    <button onClick={openModalForAdd} className="inline-flex items-center gap-2 bg-[#1877f2] hover:bg-[#166fe5] text-white font-medium py-2 px-4 rounded-lg shadow-sm">
+                        <i className='bx bx-plus text-lg'></i>
+                        <span>Tambah KPI</span>
+                    </button>
+                </div>
             </div>
 
             <div className="overflow-x-auto mb-8">
@@ -333,69 +495,127 @@ const KpiManager: React.FC = () => {
                             </button>
                         </div>
                         <form onSubmit={handleSave} className="p-6">
+                            {/* Form untuk ADD/EDIT */}
+                            {/* Platform & Jenis KPI selalu tampil */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-                                <div className="lg:col-span-2">
-                                    <FormInput label="Nama KPI" type="text" value={formState.name || ''} onChange={(e:any) => handleInputChange('name', e.target.value)} required />
-                                </div>
                                 <FormInput label="Platform/Grup" type="text" value={formState.platform || ''} onChange={(e:any) => handleInputChange('platform', e.target.value)} placeholder="Contoh: Shopee" required />
-                                <FormInput label="Bobot (%)" type="number" value={formState.bobot || ''} onChange={(e:any) => handleInputChange('bobot', e.target.value)} required />
-                                <div className="flex items-end gap-2">
-                                    <div className="flex-grow">
-                                        <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                                            Target
-                                            <span className="relative group inline-flex">
-                                                <button type="button" aria-label="Informasi Target" className="inline-flex items-center justify-center w-5 h-5 rounded-full border-2 border-yellow-400 text-yellow-500 bg-white dark:bg-slate-700 shadow hover:bg-yellow-50">
-                                                    <i className='bx bx-info-circle text-[14px]'></i>
-                                                </button>
-                                                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 px-3 py-2 opacity-0 group-hover:opacity-100 group-hover:-translate-y-[110%] transition z-10 whitespace-nowrap">
-                                                    Jika memilih Rp, KPI ini akan dijumlahkan sebagai Omset untuk divisi Berbasis Omset (kecuali KPI biaya).
-                                                    <span className="absolute left-1/2 -bottom-1 -translate-x-1/2 w-2 h-2 bg-white dark:bg-slate-800 border-l border-t border-slate-200 dark:border-slate-700 transform rotate-45"></span>
+                                <FormSelect label="Jenis KPI" value={formState.kpiType || 'GENERAL'} onChange={(e:any) => {
+                                    const nextType = e.target.value as 'GENERAL' | 'ROAS';
+                                    setFormState(prev => ({
+                                        ...prev,
+                                        kpiType: nextType,
+                                        // reset sebagian field saat ganti mode
+                                        name: nextType === 'GENERAL' ? prev.name : '',
+                                        bobot: nextType === 'GENERAL' ? prev.bobot : '',
+                                        target: nextType === 'GENERAL' ? prev.target : '',
+                                        minTarget: nextType === 'GENERAL' ? prev.minTarget : '',
+                                        isCurrency: nextType === 'ROAS' ? false : prev.isCurrency,
+                                        isPercentage: nextType === 'ROAS' ? false : prev.isPercentage,
+                                    }));
+                                }}>
+                                    <option value="GENERAL">GENERAL KPI</option>
+                                    <option value="ROAS">KPI ROAS (Biaya Iklan vs Omset)</option>
+                                </FormSelect>
+
+                                {/* Tampilkan Nama/Bobot/Target single-KPI hanya ketika EDIT atau GENERAL */}
+                                {(isEditing || formState.kpiType === 'GENERAL') && (
+                                    <>
+                                        <div className="lg:col-span-2">
+                                            <FormInput label="Nama KPI" type="text" value={formState.name || ''} onChange={(e:any) => handleInputChange('name', e.target.value)} required />
+                                        </div>
+                                        <FormInput label="Bobot (%)" type="number" value={formState.bobot || ''} onChange={(e:any) => handleInputChange('bobot', e.target.value)} required />
+                                        <div className="flex items-end gap-2">
+                                            <div className="flex-grow">
+                                                <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                                                    Target
+                                                </label>
+                                                <input 
+                                                    type="text" 
+                                                    value={formState.target || ''} 
+                                                    onChange={(e:any) => handleInputChange('target', (formState.kpiType === 'ROAS' ? e.target.value : (formState.isCurrency ? formatToRupiah(e.target.value) : e.target.value)))}
+                                                    required 
+                                                    className="mt-1 w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-[#1877f2]"
+                                                />
+                                                {formState.kpiType === 'ROAS' && (
+                                                    <span className="block text-xs text-slate-400 mt-1">Masukkan target ROAS dalam angka. Contoh: 5 berarti 5x.</span>
+                                                )}
+                                            </div>
+                                            <div className="relative">
+                                                <div className="flex items-center gap-2">
+                                                    <select
+                                                        value={formState.kpiType === 'ROAS' ? 'number' : (formState.isCurrency ? 'currency' : formState.isPercentage ? 'percentage' : 'number')}
+                                                        onChange={e => handleTargetTypeChange(e.target.value as any)}
+                                                        disabled={formState.kpiType === 'ROAS'}
+                                                        className="h-10 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1877f2] px-2"
+                                                    >
+                                                        <option value="currency">Rp</option>
+                                                        <option value="percentage">%</option>
+                                                        <option value="number">Angka</option>
+                                                    </select>
                                                 </div>
-                                            </span>
-                                        </label>
-                                        <input 
-                                            type="text" 
-                                            value={formState.target || ''} 
-                                            onChange={(e:any) => handleInputChange('target', formState.isCurrency ? formatToRupiah(e.target.value) : e.target.value)}
-                                            required 
-                                            className="mt-1 w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-[#1877f2]"
-                                        />
-                                    </div>
-                                    <div className="relative">
-                                        <div className="flex items-center gap-2">
-                                            <select
-                                                value={formState.isCurrency ? 'currency' : formState.isPercentage ? 'percentage' : 'number'}
-                                                onChange={e => handleTargetTypeChange(e.target.value as any)}
-                                                className="h-10 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1877f2] px-2"
-                                            >
-                                                <option value="currency">Rp</option>
-                                                <option value="percentage">%</option>
-                                                <option value="number">Angka</option>
-                                            </select>
-                                            <span className="relative group inline-flex">
-                                                <button type="button" aria-label="Informasi Tipe Target" className="inline-flex items-center justify-center w-5 h-5 rounded-full border-2 border-yellow-400 text-yellow-500 bg-white dark:bg-slate-700 shadow hover:bg-yellow-50">
-                                                    <i className='bx bx-info-circle text-[14px]'></i>
-                                                </button>
-                                                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 px-3 py-2 opacity-0 group-hover:opacity-100 group-hover:-translate-y-[110%] transition z-10 whitespace-nowrap">
-                                                    Tipe target: Rp, %, atau Angka. KPI Rp akan dihitung sebagai Omset (kecuali biaya).
-                                                    <span className="absolute left-1/2 -bottom-1 -translate-x-1/2 w-2 h-2 bg-white dark:bg-slate-800 border-l border-t border-slate-200 dark:border-slate-700 transform rotate-45"></span>
-                                                </div>
-                                            </span>
+                                            </div>
+                                        </div>
+                                        {formState.kpiType === 'ROAS' && (
+                                            <FormInput label="Target Min." type="text" value={formState.minTarget || ''} onChange={(e:any) => handleInputChange('minTarget', e.target.value)} />
+                                        )}
+                                        <FormSelect label="Tipe Kalkulasi" value={formState.type} onChange={(e:any) => handleInputChange('type', e.target.value)} required>
+                                            <option value="higher_is_better">Makin Tinggi, Makin Baik</option>
+                                            <option value="lower_is_better">Makin Rendah, Makin Baik</option>
+                                        </FormSelect>
+                                        <FormSelect label="Batas Poin" value={formState.pointCapping} onChange={(e:any) => handleInputChange('pointCapping', e.target.value)} required>
+                                            <option value="uncapped">Tanpa Batas</option>
+                                            <option value="capped">Poin Maksimal</option>
+                                        </FormSelect>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Paket ROAS (mode tambah baru saja) */}
+                            {!isEditing && formState.kpiType === 'ROAS' && (
+                                <div className="mt-6 space-y-6">
+                                    <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30">
+                                        <h4 className="font-semibold mb-3">KPI ROAS</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <FormInput label="Bobot (%)" type="number" value={formState.roasBobot || ''} onChange={(e:any) => handleInputChange('roasBobot', e.target.value)} />
+                                            <FormInput label="Target (Angka)" type="number" value={formState.roasTarget || ''} onChange={(e:any) => handleInputChange('roasTarget', e.target.value)} />
+                                            <FormInput label="Target Min. (Angka)" type="number" value={formState.roasMinTarget || ''} onChange={(e:any) => handleInputChange('roasMinTarget', e.target.value)} />
                                         </div>
                                     </div>
+                                    <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="font-semibold">KPI Omset</h4>
+                                            <label className="inline-flex items-center gap-2 text-sm">
+                                                <input type="checkbox" checked={formState.omsetEnabled} onChange={(e:any) => handleInputChange('omsetEnabled', e.target.checked)} />
+                                                <span>Aktifkan</span>
+                                            </label>
+                                        </div>
+                                        {formState.omsetEnabled && (
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                                                <FormInput label="Bobot (%)" type="number" value={formState.omsetBobot || ''} onChange={(e:any) => handleInputChange('omsetBobot', e.target.value)} />
+                                                <FormInput label="Target (Rp)" type="text" value={formState.omsetTarget || ''} onChange={(e:any) => handleInputChange('omsetTarget', formatToRupiah(e.target.value))} />
+                                                <div className="flex items-end text-xs text-slate-500">Tipe: Rupiah, Kalkulasi: Makin Tinggi, Makin Baik</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="font-semibold">KPI Biaya Iklan</h4>
+                                            <label className="inline-flex items-center gap-2 text-sm">
+                                                <input type="checkbox" checked={formState.biayaEnabled} onChange={(e:any) => handleInputChange('biayaEnabled', e.target.checked)} />
+                                                <span>Aktifkan</span>
+                                            </label>
+                                        </div>
+                                        {formState.biayaEnabled && (
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                                                <FormInput label="Bobot (%)" type="number" value={formState.biayaBobot || ''} onChange={(e:any) => handleInputChange('biayaBobot', e.target.value)} />
+                                                <FormInput label="Target (Rp)" type="text" value={formState.biayaTarget || ''} onChange={(e:any) => handleInputChange('biayaTarget', formatToRupiah(e.target.value))} />
+                                                <div className="flex items-end text-xs text-slate-500">Tipe: Rupiah, Kalkulasi: Makin Rendah, Makin Baik</div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                {formState.name?.toLowerCase().includes('roas') && (
-                                    <FormInput label="Target Min." type="text" value={formState.minTarget || ''} onChange={(e:any) => handleInputChange('minTarget', e.target.value)} />
-                                )}
-                                <FormSelect label="Tipe Kalkulasi" value={formState.type} onChange={(e:any) => handleInputChange('type', e.target.value)} required>
-                                    <option value="higher_is_better">Makin Tinggi, Makin Baik</option>
-                                    <option value="lower_is_better">Makin Rendah, Makin Baik</option>
-                                </FormSelect>
-                                <FormSelect label="Batas Poin" value={formState.pointCapping} onChange={(e:any) => handleInputChange('pointCapping', e.target.value)} required>
-                                    <option value="uncapped">Tanpa Batas</option>
-                                    <option value="capped">Poin Maksimal</option>
-                                </FormSelect>
-                            </div>
+                            )}
+
                             <div className="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
                                 <button type="button" onClick={closeModal} className="bg-slate-100 dark:bg-slate-600 text-slate-800 dark:text-slate-200 font-medium py-2 px-5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-500">Batal</button>
                                 <button type="submit" className="bg-[#1877f2] hover:bg-[#166fe5] text-white font-medium py-2 px-6 rounded-lg">{isEditing ? 'Update' : 'Simpan'}</button>

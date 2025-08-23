@@ -4,7 +4,12 @@ import { DivisionData } from '../../types';
 
 declare const Chart: any;
 
-const ComparisonChart: React.FC = () => {
+interface ComparisonChartProps {
+    selectedMonth?: string;
+    selectedYear?: string;
+}
+
+const ComparisonChart: React.FC<ComparisonChartProps> = ({ selectedMonth, selectedYear }) => {
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstance = useRef<any>(null);
     const { currentDivisionData, theme } = useContext(AppContext);
@@ -14,8 +19,15 @@ const ComparisonChart: React.FC = () => {
 
         const data = currentDivisionData;
 
+        // Filter history based on selected month and year
+        const filteredHistory = data.history.filter(record => {
+            const matchesMonth = !selectedMonth || record.periodMonth === selectedMonth;
+            const matchesYear = !selectedYear || record.periodYear?.toString() === selectedYear;
+            return matchesMonth && matchesYear;
+        });
+
         const latestScores = data.employees.map(emp => {
-            const empHistory = data.history.filter(h => h.employeeId === emp.id);
+            const empHistory = filteredHistory.filter(h => h.employeeId === emp.id);
             const latestEntry = empHistory.sort((a, b) => b.id - a.id)[0];
             return latestEntry ? latestEntry.totalPoints : 0;
         });
@@ -71,7 +83,7 @@ const ComparisonChart: React.FC = () => {
                 chartInstance.current.destroy();
             }
         };
-    }, [currentDivisionData, theme]);
+    }, [currentDivisionData, theme, selectedMonth, selectedYear]);
 
     return <div style={{ height: '300px' }}><canvas ref={chartRef}></canvas></div>;
 };

@@ -8,6 +8,8 @@ import ResultsSection from './ResultsSection';
 import { exportToExcel, exportToPDF, generatePdfDataUri } from '../../utils/export';
 import { formatCurrency } from '../../utils/formatters';
 
+const API_BASE: string = (import.meta as any).env?.VITE_API_BASE ?? 'http://localhost:8080';
+
 const CalculatorView: React.FC = () => {
     const { setAppData, currentDivision, currentDivisionData, addLog } = useContext(AppContext);
     const { kpiConfigs, bonusSchemes, kpiIndicators, employees, bonusCalculationMethod, history } = currentDivisionData;
@@ -31,7 +33,44 @@ const CalculatorView: React.FC = () => {
         setResults(null);
     }, [currentDivision, employees]);
 
-    const handleCalculate = useCallback(() => {
+    const handleCalculate = useCallback(async () => {
+        const payload = {
+            kpiConfigs,
+            bonusSchemes,
+            kpiIndicators,
+            realisasiInputs,
+            bonusCalculationMethod,
+            customCostKeywords: currentDivisionData.costKeywords || []
+        };
+        const envBase: string | undefined = (import.meta as any).env?.VITE_API_BASE;
+        const baseCandidates = [
+            API_BASE,
+            envBase,
+            `${window.location.protocol}//${window.location.hostname}:8081`,
+            `${window.location.protocol}//${window.location.hostname}:8080`,
+        ].filter((v, i, arr) => typeof v === 'string' && v && arr.indexOf(v) === i) as string[];
+
+        const tryRequest = async (base: string): Promise<CalculationResult | null> => {
+            try {
+                const res = await fetch(`${base}/calculate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) return null;
+                const data: CalculationResult = await res.json();
+                return data;
+            } catch {
+                return null;
+            }
+        };
+
+        for (const base of baseCandidates) {
+            const data = await tryRequest(base);
+            if (data) { setResults(data); return; }
+        }
+
+        // Fallback ke perhitungan lokal jika seluruh percobaan API gagal
         const calculatedResults = calculateBonus(
             kpiConfigs,
             bonusSchemes,
@@ -188,7 +227,7 @@ const CalculatorView: React.FC = () => {
                     <button onClick={handleCalculate} className="bg-blue-600 text-white font-semibold py-3 px-10 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:ring-offset-slate-800 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-blue-500/50">
                         Hitung Ulang
                     </button>
-                    <button onClick={openSaveModal} className="bg-green-600 text-white font-semibold py-3 px-10 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:ring-offset-slate-800 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-green-500/50 flex items-center gap-2" disabled={!results || !selectedEmployeeId}>
+                    <button onClick={openSaveModal} className="bg-green-600 text-white font-semibold py-3 px-10 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:ring-offset-slate-800 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-green-500/50">
                          <i className='bx bx-save text-xl'></i> Simpan Hasil
                     </button>
                 </div>

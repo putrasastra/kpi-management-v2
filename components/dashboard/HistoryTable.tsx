@@ -9,6 +9,8 @@ const HistoryTable: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [viewingRecord, setViewingRecord] = useState<HistoryEntry | null>(null);
     const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
+    const [selectedMonth, setSelectedMonth] = useState<string>('');
+    const [selectedYear, setSelectedYear] = useState<string>('');
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -39,11 +41,14 @@ const HistoryTable: React.FC = () => {
 
     const filteredHistory = useMemo(() => {
         return currentDivisionData.history
-            .filter(record => 
-                record.employeeName.toLowerCase().includes(searchTerm.toLowerCase())
-            )
+            .filter(record => {
+                const matchesSearch = record.employeeName.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesMonth = !selectedMonth || record.periodMonth === selectedMonth;
+                const matchesYear = !selectedYear || record.periodYear?.toString() === selectedYear;
+                return matchesSearch && matchesMonth && matchesYear;
+            })
             .sort((a, b) => b.id - a.id);
-    }, [currentDivisionData.history, searchTerm]);
+    }, [currentDivisionData.history, searchTerm, selectedMonth, selectedYear]);
 
     const handleDelete = useCallback((id: number) => {
         const recordToDelete = currentDivisionData.history.find(h => h.id === id);
@@ -79,14 +84,60 @@ const HistoryTable: React.FC = () => {
     
     return (
         <>
-            <div className="mb-4">
-                <input
-                    type="text"
-                    placeholder="Cari berdasarkan nama staff..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full max-w-sm p-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+            <div className="mb-4 space-y-4">
+                <div className="flex flex-wrap gap-4">
+                    <input
+                        type="text"
+                        placeholder="Cari berdasarkan nama staff..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="flex-1 min-w-64 p-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <select
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        className="p-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 dark:text-slate-300"
+                    >
+                        <option value="">Semua Bulan</option>
+                        <option value="Januari">Januari</option>
+                        <option value="Februari">Februari</option>
+                        <option value="Maret">Maret</option>
+                        <option value="April">April</option>
+                        <option value="Mei">Mei</option>
+                        <option value="Juni">Juni</option>
+                        <option value="Juli">Juli</option>
+                        <option value="Agustus">Agustus</option>
+                        <option value="September">September</option>
+                        <option value="Oktober">Oktober</option>
+                        <option value="November">November</option>
+                        <option value="Desember">Desember</option>
+                    </select>
+                    <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(e.target.value)}
+                        className="p-2 bg-slate-100 dark:bg-slate-700 border-none rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 dark:text-slate-300"
+                    >
+                        <option value="">Semua Tahun</option>
+                        {Array.from(new Set(currentDivisionData.history.map(record => record.periodYear).filter(Boolean)))
+                            .sort((a, b) => Number(b || 0) - Number(a || 0))
+                            .map(year => (
+                                <option key={year} value={year?.toString()}>{year}</option>
+                            ))}
+                    </select>
+                    {(selectedMonth || selectedYear || searchTerm) && (
+                        <button
+                            onClick={() => {
+                                setSearchTerm('');
+                                setSelectedMonth('');
+                                setSelectedYear('');
+                            }}
+                            className="px-3 py-2 bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors flex items-center gap-2"
+                        >
+                            <i className='bx bx-x'></i>
+                            Reset Filter
+                        </button>
+                    )}
+                </div>
             </div>
             <div className="overflow-x-auto">
                 <table className="min-w-full">

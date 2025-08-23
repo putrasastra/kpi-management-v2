@@ -4,7 +4,12 @@ import { AppContext } from '../../context/AppContext';
 
 declare const Chart: any;
 
-const TrendChart: React.FC = () => {
+interface TrendChartProps {
+    selectedMonth?: string;
+    selectedYear?: string;
+}
+
+const TrendChart: React.FC<TrendChartProps> = ({ selectedMonth, selectedYear }) => {
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstance = useRef<any>(null);
     const { currentDivisionData, theme } = useContext(AppContext);
@@ -27,7 +32,13 @@ const TrendChart: React.FC = () => {
         const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 
         const employeeHistory = data.history
-            .filter(h => h.employeeId.toString() === selectedEmployeeId && h.periodMonth && h.periodYear)
+            .filter(h => {
+                const matchesEmployee = h.employeeId.toString() === selectedEmployeeId;
+                const hasPeriod = h.periodMonth && h.periodYear;
+                const matchesMonth = !selectedMonth || h.periodMonth === selectedMonth;
+                const matchesYear = !selectedYear || h.periodYear?.toString() === selectedYear;
+                return matchesEmployee && hasPeriod && matchesMonth && matchesYear;
+            })
             .sort((a, b) => {
                 const dateA = new Date(a.periodYear, months.indexOf(a.periodMonth));
                 const dateB = new Date(b.periodYear, months.indexOf(b.periodMonth));
@@ -112,7 +123,7 @@ const TrendChart: React.FC = () => {
                 chartInstance.current.destroy();
             }
         };
-    }, [currentDivisionData, selectedEmployeeId, theme]);
+    }, [currentDivisionData, selectedEmployeeId, theme, selectedMonth, selectedYear]);
 
     return (
         <div>
